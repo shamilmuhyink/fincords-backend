@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: uat
+  datasource:
+    url: jdbc:mysql://uat-db-server:3306/finance_tracker_uat?useSSL=true&serverTimezone=UTC
+    username: uat_user
+    password: uat_password
+  jpa:
+    show-sql: true
+
+server:
+  port: 8081

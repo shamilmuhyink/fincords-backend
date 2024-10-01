@@ -1,0 +1,18 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://prod-db-server:3306/finance_tracker_prod?useSSL=true&serverTimezone=UTC
+    username: ${PROD_DB_USERNAME}
+    password: ${PROD_DB_PASSWORD}
+  jpa:
+    show-sql: false
+
+server:
+  port: 80
+
+logging:
+  level:
+    org.springframework: WARN
+    org.hibernate: WARN
