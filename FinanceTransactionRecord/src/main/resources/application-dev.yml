@@ -11,12 +11,17 @@ spring:
 
 server:
   port: 8080
+  compression:
+    enabled: true
 
 logging:
   level:
-    root: info
-    com.fincords: debug
+    web: DEBUG
+    root: INFO
+    com.fincords: DEBUG
   file:
-    path: logs/fincords.log
+    name: logs/fincords.log
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+  logstash:
+    enabled: false
