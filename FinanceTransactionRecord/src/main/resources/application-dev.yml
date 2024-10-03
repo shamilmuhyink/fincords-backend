@@ -11,3 +11,12 @@ spring:
 
 server:
   port: 8080
+
+logging:
+  level:
+    root: info
+    com.fincords: debug
+  file:
+    path: logs/fincords.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
