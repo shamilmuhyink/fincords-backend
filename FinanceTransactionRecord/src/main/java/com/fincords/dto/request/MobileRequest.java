@@ -1,8 +1,8 @@
-package com.fincords.requestDTO;
+package com.fincords.dto.request;
 
 import lombok.Data;
 
 @Data
-public class OtpRequest {
+public class MobileRequest {
     private String mobileNumber;
 }

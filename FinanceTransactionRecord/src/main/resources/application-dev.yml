@@ -3,7 +3,7 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:mysql://localhost:3306/fincords?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/fincords?useSSL=false&serverTimezone=Asia/Kolkata&allowPublicKeyRetrieval=true
     username: root
     password: root
   jpa:
@@ -25,3 +25,15 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
   logstash:
     enabled: false
+
+# JWT properties
+fincords:
+  jwt:
+    secret: "AYKSDA13Rd3hhq41VcYGkS2alfwbe3QLPmJb9YUE1PU="
+    expiration: 3600000
+
+#Twilio variables
+twilio:
+  sid: AC56f3436d05f4c43f5b15875271a4e260
+  token: fddccb800a082e04a21314f340173d12
+  number: +12075032978
