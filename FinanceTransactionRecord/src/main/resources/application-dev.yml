@@ -35,5 +35,5 @@ fincords:
 #Twilio variables
 twilio:
   sid: AC56f3436d05f4c43f5b15875271a4e260
-  token: fddccb800a082e04a21314f340173d12
+  token: e8130617d84a02ff631d6439554b3b49
   number: +12075032978

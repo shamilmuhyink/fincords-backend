@@ -1,20 +1,21 @@
 package com.fincords.controller;
 
+import com.fincords.dto.request.LoginRequest;
 import com.fincords.dto.request.MobileRequest;
+import com.fincords.dto.respone.ResponseMaster;
+import com.fincords.exception.InvalidMobileNumberException;
 import com.fincords.service.AuthService;
 import com.fincords.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
+@CrossOrigin(origins = "http://localhost:4200")
 @RequestMapping("v1/api/auth")
 public class AuthController {
 
@@ -24,17 +25,17 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @PostMapping("/generate-otp")
+    @PostMapping("/request-otp")
     public ResponseEntity<?> generateOtp(@RequestBody MobileRequest request) {
         String mobileNumber = request.getMobileNumber();
-        String otp = authService.generateOtp(mobileNumber);
-        return ResponseEntity.ok(Map.of("message", "OTP sent successfully"));
+        ResponseMaster response  = authService.generateOtp(mobileNumber);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> request) {
-        String mobileNumber = request.get("mobileNumber");
-        String otp = request.get("otp");
+    public ResponseEntity<?> verifyOtp(@RequestBody LoginRequest request) {
+        String mobileNumber = request.getMobileNumber();
+        String otp = request.getOtp();
 
         if (authService.verifyOtp(mobileNumber, otp)) {
             UserDetails userDetails = authService.loadUserByUsername(mobileNumber);

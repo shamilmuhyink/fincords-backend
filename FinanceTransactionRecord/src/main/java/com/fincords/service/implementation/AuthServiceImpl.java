@@ -1,5 +1,10 @@
 package com.fincords.service.implementation;
 
+import com.fincords.dto.respone.ResponseMaster;
+import com.fincords.exception.AccountNotFoundException;
+import com.fincords.exception.InvalidMobileNumberException;
+import com.fincords.exception.RoleNotFoundException;
+import com.fincords.exception.TwilioException;
 import com.fincords.model.Account;
 import com.fincords.model.Role;
 import com.fincords.repository.AccountRepository;
@@ -8,7 +13,9 @@ import com.fincords.service.AuthService;
 import com.fincords.util.JwtUtil;
 import com.fincords.util.TwilioUtil;
 import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,7 +27,7 @@ import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-@Log
+@Slf4j
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -33,32 +40,80 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private TwilioUtil twilioUtil;
+
     @Override
     @Transactional
-    public String generateOtp(String mobileNumber) {
-//        Generate OTP
-        String otp = generateRandomOtp();
+    public ResponseMaster generateOtp(String mobileNumber) {
+        log.info("Generating OTP for mobile number: " + mobileNumber);
+        try {
+            // Validate mobile number
+            if (!isValidMobileNumber(mobileNumber)) {
+                log.warn("Invalid mobile number format: " + mobileNumber);
+                throw new InvalidMobileNumberException(400, "Invalid mobile number format");
+            }
 
-//        Create user if not found in records
-        Account account = accountRepository.findByMobileNumber(mobileNumber)
-                .orElse(new Account());
+            // Generate OTP
+            String otp = generateRandomOtp();
 
-        account.setMobileNumber(mobileNumber);
-        account.setOtp(otp);
-        account.setOtpGeneratedAt(LocalDateTime.now());
-        
-        // Set default role for new users
-        if (account.getRoles().isEmpty()) {
-            Role userRole = roleRepository.findByName("ROLE_USER")
-                    .orElseGet(() -> roleRepository.save(new Role("ROLE_USER")));
-            account.getRoles().add(userRole);
+            // Find or create user
+            Account account = accountRepository.findByMobileNumber(mobileNumber)
+                    .orElseGet(() -> {
+                        Account newAccount = new Account();
+                        newAccount.setMobileNumber(mobileNumber);
+                        return newAccount;
+                    });
+
+            // Update user with OTP
+            account.setOtp(otp);
+            account.setOtpGeneratedAt(LocalDateTime.now());
+
+            // Assign default role if not already assigned
+            if (account.getRoles().isEmpty()) {
+                Role userRole = roleRepository.findByName("ROLE_USER")
+                        .orElseGet(() -> roleRepository.save(new Role("ROLE_USER")));
+                account.getRoles().add(userRole);
+            }
+
+            // Save user
+            accountRepository.save(account);
+
+            // Send OTP via Twilio
+            boolean isOtpSent = twilioUtil.sendOtp(mobileNumber, otp);
+
+            // Return response
+            if (isOtpSent) {
+                log.info("OTP sent successfully to mobile number: " + mobileNumber);
+                return ResponseMaster.builder()
+                        .status(HttpStatus.OK.value())
+                        .message("OTP sent successfully")
+                        .build();
+            } else {
+                log.error("Failed to send OTP to mobile number: " + mobileNumber);
+                return ResponseMaster.builder()
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                        .message("Failed to send OTP")
+                        .build();
+            }
+        } catch (InvalidMobileNumberException e) {
+            log.error("Invalid mobile number format: " + mobileNumber, e);
+            return ResponseMaster.builder()
+                    .status(HttpStatus.BAD_REQUEST.value())
+                    .message("Invalid mobile number format")
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to generate OTP for mobile number: " + mobileNumber, e);
+            return ResponseMaster.builder()
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                    .message("Failed to generate OTP")
+                    .build();
         }
+    }
 
-        accountRepository.save(account);
-
-        // In a real application, you would send this OTP via SMS
-        boolean isOtpSent = TwilioUtil.sentOtp(mobileNumber, otp);
-        return otp;
+    private boolean isValidMobileNumber(String mobileNumber) {
+        String mobileNumberPattern = "^[0-9+\\-\\(\\)\\.\\s]{3,20}$";
+        return mobileNumber.matches(mobileNumberPattern);
     }
 
     @Override

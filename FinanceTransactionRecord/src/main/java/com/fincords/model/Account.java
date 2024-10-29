@@ -28,7 +28,7 @@ public class Account {
     private LocalDateTime OtpGeneratedAt;
 
     @Column(nullable = false)
-    private LocalDateTime accountCreateAt = LocalDateTime.now();
+    private LocalDateTime accountCreatedAt = LocalDateTime.now();
 
     @Column(nullable = false)
     private Boolean isActive = true;
