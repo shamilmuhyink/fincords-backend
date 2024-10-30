@@ -1,15 +1,13 @@
 package com.fincords.controller;
 
-import com.fincords.dto.request.LoginRequest;
-import com.fincords.dto.request.MobileRequest;
-import com.fincords.dto.respone.ResponseMaster;
-import com.fincords.exception.InvalidMobileNumberException;
+import com.fincords.dto.request.OtpRequestDTO;
+import com.fincords.dto.request.OtpVerificationDTO;
+import com.fincords.dto.respone.ApiResponse;
 import com.fincords.service.AuthService;
-import com.fincords.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -22,28 +20,16 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
     @PostMapping("/request-otp")
-    public ResponseEntity<?> generateOtp(@RequestBody MobileRequest request) {
-        String mobileNumber = request.getMobileNumber();
-        ResponseMaster response  = authService.generateOtp(mobileNumber);
+    public ResponseEntity<ApiResponse<Object>> sendOtp(@Validated @RequestBody OtpRequestDTO request) {
+        ApiResponse<Object> response  = authService.sendOtp(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<?> verifyOtp(@RequestBody LoginRequest request) {
-        String mobileNumber = request.getMobileNumber();
-        String otp = request.getOtp();
-
-        if (authService.verifyOtp(mobileNumber, otp)) {
-            UserDetails userDetails = authService.loadUserByUsername(mobileNumber);
-            String token = jwtUtil.generateToken(userDetails);
-            return ResponseEntity.ok(Map.of("token", token));
-        } else {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid OTP"));
-        }
+    public ResponseEntity<ApiResponse<Object>> verifyOtp(@Validated @RequestBody OtpVerificationDTO request) {
+        ApiResponse<Object> response = authService.verifyOtp(request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/assign-role")

@@ -1,10 +1,11 @@
 package com.fincords.service.implementation;
 
-import com.fincords.dto.respone.ResponseMaster;
-import com.fincords.exception.AccountNotFoundException;
+import com.fincords.dto.request.OtpRequestDTO;
+import com.fincords.dto.request.OtpVerificationDTO;
+import com.fincords.dto.respone.ApiResponse;
+import com.fincords.dto.respone.AuthResponseDTO;
+import com.fincords.exception.AuthException;
 import com.fincords.exception.InvalidMobileNumberException;
-import com.fincords.exception.RoleNotFoundException;
-import com.fincords.exception.TwilioException;
 import com.fincords.model.Account;
 import com.fincords.model.Role;
 import com.fincords.repository.AccountRepository;
@@ -12,9 +13,10 @@ import com.fincords.repository.RoleRepository;
 import com.fincords.service.AuthService;
 import com.fincords.util.JwtUtil;
 import com.fincords.util.TwilioUtil;
-import lombok.extern.java.Log;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     @Autowired
@@ -43,17 +46,15 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private TwilioUtil twilioUtil;
 
+    @Value("${jwt.expiration}")
+    private Long expiration;
+
     @Override
     @Transactional
-    public ResponseMaster generateOtp(String mobileNumber) {
-        log.info("Generating OTP for mobile number: " + mobileNumber);
+    public ApiResponse<Object> sendOtp(OtpRequestDTO request) {
+        log.info("Generating OTP for mobile number: " + request);
+        String mobileNumber = request.getMobileNumber();
         try {
-            // Validate mobile number
-            if (!isValidMobileNumber(mobileNumber)) {
-                log.warn("Invalid mobile number format: " + mobileNumber);
-                throw new InvalidMobileNumberException(400, "Invalid mobile number format");
-            }
-
             // Generate OTP
             String otp = generateRandomOtp();
 
@@ -67,12 +68,12 @@ public class AuthServiceImpl implements AuthService {
 
             // Update user with OTP
             account.setOtp(otp);
-            account.setOtpGeneratedAt(LocalDateTime.now());
+            account.setOtpExpiryTime(LocalDateTime.now().plusSeconds(expiration));
 
             // Assign default role if not already assigned
             if (account.getRoles().isEmpty()) {
-                Role userRole = roleRepository.findByName("ROLE_USER")
-                        .orElseGet(() -> roleRepository.save(new Role("ROLE_USER")));
+                Role userRole = roleRepository.findByName("USER")
+                        .orElseGet(() -> roleRepository.save(new Role("USER")));
                 account.getRoles().add(userRole);
             }
 
@@ -85,49 +86,87 @@ public class AuthServiceImpl implements AuthService {
             // Return response
             if (isOtpSent) {
                 log.info("OTP sent successfully to mobile number: " + mobileNumber);
-                return ResponseMaster.builder()
+                return ApiResponse.builder()
                         .status(HttpStatus.OK.value())
                         .message("OTP sent successfully")
+                        .timestamp(LocalDateTime.now())
                         .build();
             } else {
                 log.error("Failed to send OTP to mobile number: " + mobileNumber);
-                return ResponseMaster.builder()
+                return ApiResponse.builder()
                         .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                         .message("Failed to send OTP")
+                        .timestamp(LocalDateTime.now())
                         .build();
             }
         } catch (InvalidMobileNumberException e) {
             log.error("Invalid mobile number format: " + mobileNumber, e);
-            return ResponseMaster.builder()
+            return ApiResponse.builder()
                     .status(HttpStatus.BAD_REQUEST.value())
                     .message("Invalid mobile number format")
+                    .timestamp(LocalDateTime.now())
                     .build();
         } catch (Exception e) {
             log.error("Failed to generate OTP for mobile number: " + mobileNumber, e);
-            return ResponseMaster.builder()
+            return ApiResponse.builder()
                     .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                     .message("Failed to generate OTP")
+                    .timestamp(LocalDateTime.now())
                     .build();
         }
-    }
-
-    private boolean isValidMobileNumber(String mobileNumber) {
-        String mobileNumberPattern = "^[0-9+\\-\\(\\)\\.\\s]{3,20}$";
-        return mobileNumber.matches(mobileNumberPattern);
     }
 
     @Override
     @Transactional
-    public boolean verifyOtp(String mobileNumber, String otp) {
-        Account account = accountRepository.findByMobileNumber(mobileNumber)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public ApiResponse<Object> verifyOtp(OtpVerificationDTO request) {
+        try{
+            String mobileNumber = request.getMobileNumber();
+            log.info("Verifying OTP for mobile number: {}", maskMobileNumber(mobileNumber));
 
-        if (account.getOtp().equals(otp)) {
-            accountRepository.save(account);
-            return true;
+            Account account = accountRepository.findByMobileNumber(mobileNumber)
+                    .orElseThrow(() -> new AuthException("User not found", HttpStatus.NOT_FOUND));
+
+            if (account.getOtpExpiryTime().isBefore(LocalDateTime.now())) {
+                throw new AuthException("OTP has expired", HttpStatus.BAD_REQUEST);
+            }
+
+            if (!account.getOtp().equals(request.getOtp())) {
+                throw new AuthException("Invalid OTP", HttpStatus.BAD_REQUEST);
+            }
+
+            UserDetails userDetails = loadUserByUsername(mobileNumber);
+
+            String token = jwtUtil.generateToken(userDetails);
+            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+
+            log.info("OTP verified successfully for mobile number: {}", maskMobileNumber(mobileNumber));
+
+            AuthResponseDTO authDTO = AuthResponseDTO.builder()
+                    .token(token)
+                    .refreshToken(refreshToken)
+                    .mobileNumber(mobileNumber)
+                    .expiresIn(jwtUtil.getExpirationTime())
+                    .build();
+
+            return ApiResponse.builder()
+                    .status(HttpStatus.OK.value())
+                    .message("OTP sent successfully")
+                    .data(authDTO)
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        } catch (AuthException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error verifying OTP: ", e);
+            throw new AuthException("Failed to verify OTP", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
 
-        return false;
+    private String maskMobileNumber(String mobileNumber) {
+        if (mobileNumber == null || mobileNumber.length() < 4) {
+            return "****";
+        }
+        return "******" + mobileNumber.substring(mobileNumber.length() - 4);
     }
 
     @Override
@@ -137,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with mobile number: " + mobileNumber));
 
         return new User(account.getMobileNumber(), account.getOtp(),
-                account.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList()));
+                account.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getId().toString())).collect(Collectors.toList()));
     }
 
     @Override

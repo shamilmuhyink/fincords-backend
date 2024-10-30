@@ -22,10 +22,7 @@ public class Account {
     private String Otp;
 
     @Column(nullable = false)
-    private Integer failedAttempsPerDay = 0;
-
-    @Column(nullable = false)
-    private LocalDateTime OtpGeneratedAt;
+    private LocalDateTime OtpExpiryTime;
 
     @Column(nullable = false)
     private LocalDateTime accountCreatedAt = LocalDateTime.now();

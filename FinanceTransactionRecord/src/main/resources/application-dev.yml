@@ -20,17 +20,23 @@ logging:
     root: INFO
     com.fincords: DEBUG
   file:
-    name: logs/fincords.log
+    path: logs/
+    name: fincords-dev.log
+    max-size: 10MB
+    max-history: 30
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
   logstash:
     enabled: false
 
+lombok:
+  slf4j:
+    simpleLogger: true
+
 # JWT properties
-fincords:
-  jwt:
-    secret: "AYKSDA13Rd3hhq41VcYGkS2alfwbe3QLPmJb9YUE1PU="
-    expiration: 3600000
+jwt:
+  secret: "AYKSDA13Rd3hhq41VcYGkS2alfwbe3QLPmJb9YUE1PU="
+  expiration: 3600000
 
 #Twilio variables
 twilio:

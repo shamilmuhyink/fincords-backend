@@ -11,15 +11,16 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component
 public class JwtUtil {
 
-    @Value("${fincords.jwt.secret}")
+    @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${fincords.jwt.expiration}")
+    @Value("${jwt.expiration}")
     private Long expiration;
 
 
@@ -32,21 +33,8 @@ public class JwtUtil {
     private String createToken(Map<String, Object> claims, String subject) {
         return Jwts.builder().setClaims(claims).setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(SignatureAlgorithm.HS256, secret).compact();
-    }
-
-    public String generateJwtToken(String mobileNumber) {
-        return Jwts.builder()
-                .setSubject(mobileNumber)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + expiration))
-                .signWith(key(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    private Key key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
     public String extractUsername(String token) {
@@ -73,5 +61,23 @@ public class JwtUtil {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("roles", userDetails.getAuthorities());
+        claims.put("refresh", true); // Add a claim to indicate it's a refresh token
+        return createRefreshToken(claims, userDetails.getUsername());
+    }
+
+    private String createRefreshToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder().setClaims(claims).setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000 * 24)) // 24 hours
+                .signWith(SignatureAlgorithm.HS256, secret).compact();
+    }
+
+    public long getExpirationTime() {
+        return expiration * 1000;
     }
 }
