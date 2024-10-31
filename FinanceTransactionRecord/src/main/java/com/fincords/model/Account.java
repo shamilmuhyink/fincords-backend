@@ -11,6 +11,7 @@ import java.util.Set;
 @Entity
 @Table(name = "account")
 public class Account {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,4 +36,10 @@ public class Account {
             joinColumns = @JoinColumn(name = "account_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
+
+    @OneToMany(mappedBy = "fromAccount")
+    private Set<Transaction> fromTransactions = new HashSet<>();
+
+    @OneToMany(mappedBy = "toAccount")
+    private Set<Transaction> toTransactions = new HashSet<>();
 }

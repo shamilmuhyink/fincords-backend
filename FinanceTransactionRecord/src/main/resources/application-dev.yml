@@ -20,8 +20,7 @@ logging:
     root: INFO
     com.fincords: DEBUG
   file:
-    path: logs/
-    name: fincords-dev.log
+    name: logs/fincords-dev.log
     max-size: 10MB
     max-history: 30
   pattern:
@@ -41,5 +40,9 @@ jwt:
 #Twilio variables
 twilio:
   sid: AC56f3436d05f4c43f5b15875271a4e260
-  token: e8130617d84a02ff631d6439554b3b49
+  token: b33dbae678dcf94fe0bb9358681cc908
   number: +12075032978
+
+# Angular properties
+angular:
+  url: http://localhost:4200
