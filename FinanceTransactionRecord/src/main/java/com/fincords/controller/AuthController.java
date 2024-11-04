@@ -20,14 +20,14 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/request-otp")
-    public ResponseEntity<ApiResponse<Object>> sendOtp(@Validated @RequestBody OtpRequestDTO request) {
-        ApiResponse<Object> response  = authService.sendOtp(request);
+    public ResponseEntity<ApiResponse<?>> sendOtp(@Validated @RequestBody OtpRequestDTO request) {
+        ApiResponse<?> response  = authService.sendOtp(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<ApiResponse<Object>> verifyOtp(@Validated @RequestBody OtpVerificationDTO request) {
-        ApiResponse<Object> response = authService.verifyOtp(request);
+    public ResponseEntity<ApiResponse<?>> verifyOtp(@Validated @RequestBody OtpVerificationDTO request) {
+        ApiResponse<?> response = authService.verifyOtp(request);
         return ResponseEntity.ok(response);
     }
 

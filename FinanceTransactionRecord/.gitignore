@@ -33,4 +33,4 @@ build/
 .vscode/
 
 ### API Properties ###
-src/main/resources
+!**/src/main/resources/

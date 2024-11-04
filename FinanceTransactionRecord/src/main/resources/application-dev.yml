@@ -35,7 +35,7 @@ lombok:
 # JWT properties
 jwt:
   secret: "AYKSDA13Rd3hhq41VcYGkS2alfwbe3QLPmJb9YUE1PU="
-  expiration: 3600000
+  expiration: 1200000 # 20 minutes
 
 #Twilio variables
 twilio:

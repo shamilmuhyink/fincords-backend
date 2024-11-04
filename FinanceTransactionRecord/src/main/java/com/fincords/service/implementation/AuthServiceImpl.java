@@ -13,6 +13,7 @@ import com.fincords.repository.RoleRepository;
 import com.fincords.service.AuthService;
 import com.fincords.util.JwtUtil;
 import com.fincords.util.TwilioUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,6 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Random;
@@ -35,10 +35,10 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService {
 
     @Autowired
-    private AccountRepository accountRepository;
+    private AccountRepository accountRepo;
 
     @Autowired
-    private RoleRepository roleRepository;
+    private RoleRepository roleRepo;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -49,9 +49,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${jwt.expiration}")
     private Long expiration;
 
-    @Override
     @Transactional
-    public ApiResponse<Object> sendOtp(OtpRequestDTO request) {
+    @Override
+    public ApiResponse<?> sendOtp(OtpRequestDTO request) {
         log.info("Generating OTP for mobile number: " + request);
         String mobileNumber = request.getMobileNumber();
         try {
@@ -59,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
             String otp = generateRandomOtp();
 
             // Find or create user
-            Account account = accountRepository.findByMobileNumber(mobileNumber)
+            Account account = accountRepo.findByMobileNumber(mobileNumber)
                     .orElseGet(() -> {
                         Account newAccount = new Account();
                         newAccount.setMobileNumber(mobileNumber);
@@ -68,17 +68,17 @@ public class AuthServiceImpl implements AuthService {
 
             // Update user with OTP
             account.setOtp(otp);
-            account.setOtpExpiryTime(LocalDateTime.now().plusSeconds(expiration));
+            account.setOtpExpireAt(LocalDateTime.now().plusSeconds(expiration));
 
             // Assign default role if not already assigned
             if (account.getRoles().isEmpty()) {
-                Role userRole = roleRepository.findByName("USER")
-                        .orElseGet(() -> roleRepository.save(new Role("USER")));
+                Role userRole = roleRepo.findByName("USER")
+                        .orElseGet(() -> roleRepo.save(new Role("USER")));
                 account.getRoles().add(userRole);
             }
 
             // Save user
-            accountRepository.save(account);
+            accountRepo.save(account);
 
             // Send OTP via Twilio
             boolean isOtpSent = twilioUtil.sendOtp(mobileNumber, otp);
@@ -103,30 +103,30 @@ public class AuthServiceImpl implements AuthService {
             log.error("Invalid mobile number format: " + mobileNumber, e);
             return ApiResponse.builder()
                     .status(HttpStatus.BAD_REQUEST.value())
-                    .message("Invalid mobile number format")
+                    .message(e.getMessage())
                     .timestamp(LocalDateTime.now())
                     .build();
         } catch (Exception e) {
             log.error("Failed to generate OTP for mobile number: " + mobileNumber, e);
             return ApiResponse.builder()
                     .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                    .message("Failed to generate OTP")
+                    .message(e.getMessage())
                     .timestamp(LocalDateTime.now())
                     .build();
         }
     }
 
-    @Override
     @Transactional
-    public ApiResponse<Object> verifyOtp(OtpVerificationDTO request) {
+    @Override
+    public ApiResponse<?> verifyOtp(OtpVerificationDTO request) {
         try{
             String mobileNumber = request.getMobileNumber();
             log.info("Verifying OTP for mobile number: {}", maskMobileNumber(mobileNumber));
 
-            Account account = accountRepository.findByMobileNumber(mobileNumber)
+            Account account = accountRepo.findByMobileNumber(mobileNumber)
                     .orElseThrow(() -> new AuthException("User not found", HttpStatus.NOT_FOUND));
 
-            if (account.getOtpExpiryTime().isBefore(LocalDateTime.now())) {
+            if (account.getOtpExpireAt().isBefore(LocalDateTime.now())) {
                 throw new AuthException("OTP has expired", HttpStatus.BAD_REQUEST);
             }
 
@@ -169,10 +169,10 @@ public class AuthServiceImpl implements AuthService {
         return "******" + mobileNumber.substring(mobileNumber.length() - 4);
     }
 
-    @Override
     @Transactional
+    @Override
     public UserDetails loadUserByUsername(String mobileNumber) throws UsernameNotFoundException {
-        Account account = accountRepository.findByMobileNumber(mobileNumber)
+        Account account = accountRepo.findByMobileNumber(mobileNumber)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with mobile number: " + mobileNumber));
 
         return new User(account.getMobileNumber(), account.getOtp(),
@@ -182,23 +182,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void assignRole(String mobileNumber, String roleName) {
-        Account account = accountRepository.findByMobileNumber(mobileNumber)
+        Account account = accountRepo.findByMobileNumber(mobileNumber)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        Role role = roleRepository.findByName(roleName)
-                .orElseGet(() -> roleRepository.save(new Role(roleName)));
+        Role role = roleRepo.findByName(roleName)
+                .orElseGet(() -> roleRepo.save(new Role(roleName)));
         account.getRoles().add(role);
-        accountRepository.save(account);
+        accountRepo.save(account);
     }
 
     @Override
     @Transactional
     public void removeRole(String mobileNumber, String roleName) {
-        Account account = accountRepository.findByMobileNumber(mobileNumber)
+        Account account = accountRepo.findByMobileNumber(mobileNumber)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        Role role = roleRepository.findByName(roleName)
+        Role role = roleRepo.findByName(roleName)
                 .orElseThrow(() -> new RuntimeException("Role not found"));
         account.getRoles().remove(role);
-        accountRepository.save(account);
+        accountRepo.save(account);
     }
 
     private String generateRandomOtp() {

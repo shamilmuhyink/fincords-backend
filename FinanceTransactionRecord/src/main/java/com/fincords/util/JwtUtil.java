@@ -1,17 +1,25 @@
 package com.fincords.util;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
+import com.fincords.model.Account;
+import com.fincords.repository.AccountRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
+@Slf4j
 @Component
 public class JwtUtil {
 
@@ -21,6 +29,8 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private Long expiration;
 
+    @Autowired
+    AccountRepository accountRepo;
 
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
@@ -31,7 +41,7 @@ public class JwtUtil {
     private String createToken(Map<String, Object> claims, String subject) {
         return Jwts.builder().setClaims(claims).setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
                 .signWith(SignatureAlgorithm.HS256, secret).compact();
     }
 
@@ -77,5 +87,23 @@ public class JwtUtil {
 
     public long getExpirationTime() {
         return expiration * 1000;
+    }
+
+    public Optional<Account> extractAccountFromAuthToken() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Object principal = authentication.getPrincipal();
+            String mobileNumber = null;
+            if (principal instanceof UserDetails) {
+                UserDetails userDetails = (UserDetails) principal;
+                mobileNumber = userDetails.getUsername();
+            } else if (principal instanceof String) {
+                mobileNumber = (String) principal;
+            }
+            return accountRepo.findByMobileNumber(mobileNumber);
+        } catch (Exception e) {
+            log.error("Error extracting account from auth token: {}", e.getMessage(), e);
+            return Optional.empty();
+        }
     }
 }
